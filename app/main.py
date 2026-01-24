@@ -78,6 +78,27 @@ def get_stats(db: Session = Depends(get_db)):
         "hard": db.query(models.Problem).filter(models.Problem.difficulty == "Hard").count(),
     }
 
+@app.put("/problems/{problem_name}", response_model=schemas.ProblemOut)
+def update_problem(
+    problem_name: str,
+    updates: schemas.ProblemUpdate,
+    db: Session = Depends(get_db),
+):
+    problem = db.query(models.Problem).filter(models.Problem.name == problem_name).first()
+
+    if not problem:
+        raise HTTPException(status_code=404, detail=f"Problem '{problem_name}' not found")
+    
+    update_data = updates.model_dump(exclude_unset=True)
+
+    for field, value in update_data.items():
+        setattr(problem, field, value)
+
+    db.commit()
+    db.refresh(problem)
+
+    return problem
+
 @app.delete("/problems/{problem_name}")
 def delete_problem(problem_name: str, db: Session = Depends(get_db)):
     problem = (
