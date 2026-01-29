@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app import models, schemas
 from app.database import SessionLocal, engine
 
-models.Base.metadata.create_all(bind=engine)
+models.Base.metadata.create_all(bind=engine) # switch to Alembic migrations
 app = FastAPI()
 
 @app.get("/")

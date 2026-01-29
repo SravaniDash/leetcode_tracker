@@ -14,6 +14,7 @@ class ProblemCreate(BaseModel):
     difficulty: DifficultyEnum
     topic: str
     notes: Optional[str] = None
+    user_id: int
 
 class ProblemUpdate(BaseModel):
     name: str
@@ -22,9 +23,18 @@ class ProblemUpdate(BaseModel):
     topic: Optional[str] = None
     notes: Optional[str] = None
 
-
 class ProblemOut(ProblemCreate):
     id: int
+
+    class Config:
+        from_attributes = True
+
+class UserCreate(BaseModel):
+    username: str
+
+class UserOut(BaseModel):
+    id: int
+    username: str
 
     class Config:
         from_attributes = True
