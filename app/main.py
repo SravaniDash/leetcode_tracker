@@ -69,6 +69,18 @@ def get_problems(
 
     return query.all()
 
+@app.get("/problems/{problem_name}", response_model=schemas.ProblemOut)
+def get_problem(
+    problem_name: str,
+    db: Session = Depends(get_db)
+):
+    problem = db.query(models.Problem).filter(models.Problem.name == problem_name).first()
+
+    if not problem:
+        raise HTTPException(status_code=404, detail="Problem not found")
+    
+    return problem
+
 @app.get("/stats")
 def get_stats(db: Session = Depends(get_db)):
     return {
