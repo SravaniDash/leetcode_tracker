@@ -14,17 +14,24 @@ class ProblemCreate(BaseModel):
     difficulty: DifficultyEnum
     topic: str
     notes: Optional[str] = None
-    user_id: int
+    username: str  # instead of user_id
 
 class ProblemUpdate(BaseModel):
     name: str
-    date_solved: Optional[date] = None
-    difficulty: Optional[DifficultyEnum] = None
-    topic: Optional[str] = None
+    date_solved: date
+    difficulty: DifficultyEnum
+    topic: str
     notes: Optional[str] = None
+    username: str
 
-class ProblemOut(ProblemCreate):
+class ProblemOut(BaseModel):
     id: int
+    name: str
+    date_solved: date
+    difficulty: DifficultyEnum
+    topic: str
+    notes: Optional[str] = None
+    username: str  # add this explicitly
 
     class Config:
         from_attributes = True

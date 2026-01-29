@@ -26,11 +26,16 @@ def create_problem(
     problem: schemas.ProblemCreate,
     db: Session = Depends(get_db)
 ):
+    # look up user by username instead of user_id
+    user = db.query(models.User).filter(models.User.username == problem.username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
     existing_problem = (
         db.query(models.Problem)
         .filter(
             models.Problem.name == problem.name,
-            models.Problem.date_solved == problem.date_solved,
+            models.Problem.user_id == user.id,
         )
         .first()
     )
@@ -38,7 +43,7 @@ def create_problem(
     if existing_problem:
         raise HTTPException(
             status_code=400,
-            detail="Problem already logged for this date",
+            detail="Problem already logged for this user",
         )
     
     db_problem = models.Problem(
@@ -47,27 +52,52 @@ def create_problem(
         difficulty=problem.difficulty,
         topic=problem.topic,
         notes=problem.notes,
+        user_id=user.id
     )
+
     db.add(db_problem)
     db.commit()
     db.refresh(db_problem)
-    return db_problem
+
+    return schemas.ProblemOut(
+        id=db_problem.id,
+        name=db_problem.name,
+        date_solved=db_problem.date_solved,
+        difficulty=db_problem.difficulty,
+        topic=db_problem.topic,
+        notes=db_problem.notes,
+        username=user.username
+    )
 
 @app.get("/problems", response_model=list[schemas.ProblemOut])
-def get_problems(
+def get_problems(db: Session = Depends(get_db)):
+
+    problems = db.query(models.Problem).all()
+    return [
+        schemas.ProblemOut(
+            id=p.id,
+            name=p.name,
+            date_solved=p.date_solved,
+            difficulty=p.difficulty,
+            topic=p.topic,
+            notes=p.notes,
+            username=p.user.username
+        )
+        for p in problems
+    ]
+
+# TODO: Implement filtering by difficulty and/or topic
+@app.get("/problems/filter", response_model=list[schemas.ProblemOut])
+def filter_problems(
     difficulty: Optional[str] = None,
     topic: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    query = db.query(models.Problem)
-
-    if difficulty:
-        query = query.filter(models.Problem.difficulty == difficulty)
-
-    if topic:
-        query = query.filter(models.Problem.topic == topic)
-
-    return query.all()
+    '''
+    Placeholder function to filter problems by difficulty, topic, or both.
+    todo later
+    '''
+    return []
 
 @app.get("/problems/{problem_name}", response_model=schemas.ProblemOut)
 def get_problem(
@@ -79,7 +109,15 @@ def get_problem(
     if not problem:
         raise HTTPException(status_code=404, detail="Problem not found")
     
-    return problem
+    return schemas.ProblemOut(
+        id=problem.id,
+        name=problem.name,
+        date_solved=problem.date_solved,
+        difficulty=problem.difficulty,
+        topic=problem.topic,
+        notes=problem.notes,
+        username=problem.user.username
+    )
 
 @app.get("/stats")
 def get_stats(db: Session = Depends(get_db)):
@@ -97,19 +135,32 @@ def update_problem(
     db: Session = Depends(get_db),
 ):
     problem = db.query(models.Problem).filter(models.Problem.name == problem_name).first()
-
     if not problem:
         raise HTTPException(status_code=404, detail=f"Problem '{problem_name}' not found")
-    
-    update_data = updates.model_dump(exclude_unset=True)
 
-    for field, value in update_data.items():
-        setattr(problem, field, value)
+    user = db.query(models.User).filter(models.User.username == updates.username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    problem.name = updates.name
+    problem.date_solved = updates.date_solved
+    problem.difficulty = updates.difficulty
+    problem.topic = updates.topic
+    problem.notes = updates.notes
+    problem.user_id = user.id
 
     db.commit()
     db.refresh(problem)
 
-    return problem
+    return schemas.ProblemOut(
+        id=problem.id,
+        name=problem.name,
+        date_solved=problem.date_solved,
+        difficulty=problem.difficulty,
+        topic=problem.topic,
+        notes=problem.notes,
+        username=user.username
+    )
 
 @app.delete("/problems/{problem_name}")
 def delete_problem(problem_name: str, db: Session = Depends(get_db)):
@@ -126,3 +177,46 @@ def delete_problem(problem_name: str, db: Session = Depends(get_db)):
     db.commit()
 
     return {"message":f"Problem '{problem_name}' deleted"}
+
+@app.post("/users", response_model=schemas.UserOut, status_code=201)
+def create_user(
+    user: schemas.UserCreate,
+    db: Session = Depends(get_db)
+):
+    existing_user = db.query(models.User).filter(models.User.username == user.username).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    
+    db_user = models.User(username=user.username)
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+@app.get("/users", response_model=list[schemas.UserOut])
+def get_users(db: Session = Depends(get_db)):
+    return db.query(models.User).all()
+
+@app.get("/users/{username}/problems", response_model=list[schemas.ProblemOut])
+def get_user_problems(
+    username: str,
+    db: Session = Depends(get_db)
+):
+    user = db.query(models.User).filter(models.User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    problems = db.query(models.Problem).filter(models.Problem.user_id == user.id).all()
+    return [
+        schemas.ProblemOut(
+            id=p.id,
+            name=p.name,
+            date_solved=p.date_solved,
+            difficulty=p.difficulty,
+            topic=p.topic,
+            notes=p.notes,
+            username=p.user.username
+        )
+        for p in problems
+    ]
+
