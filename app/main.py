@@ -163,10 +163,17 @@ def update_problem(
     )
 
 @app.delete("/problems/{problem_name}")
-def delete_problem(problem_name: str, db: Session = Depends(get_db)):
+def delete_problem(
+    username: str,
+    problem_name: str, 
+    db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
     problem = (
         db.query(models.Problem)
-        .filter(models.Problem.name == problem_name)
+        .filter(models.Problem.name == problem_name, models.Problem.user_id == user.id)
         .first()
     )
 
@@ -176,7 +183,7 @@ def delete_problem(problem_name: str, db: Session = Depends(get_db)):
     db.delete(problem)
     db.commit()
 
-    return {"message":f"Problem '{problem_name}' deleted"}
+    return {"message":f"Problem '{problem_name}' deleted for user '{username}'"}
 
 @app.post("/users", response_model=schemas.UserOut, status_code=201)
 def create_user(
