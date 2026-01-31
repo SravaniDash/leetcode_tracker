@@ -130,24 +130,27 @@ def get_stats(db: Session = Depends(get_db)):
 
 @app.put("/problems/{problem_name}", response_model=schemas.ProblemOut)
 def update_problem(
+    username: str,
     problem_name: str,
     updates: schemas.ProblemUpdate,
     db: Session = Depends(get_db),
 ):
-    problem = db.query(models.Problem).filter(models.Problem.name == problem_name).first()
-    if not problem:
-        raise HTTPException(status_code=404, detail=f"Problem '{problem_name}' not found")
-
-    user = db.query(models.User).filter(models.User.username == updates.username).first()
+    user = db.query(models.User).filter(models.User.username == username).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    
+    problem = (
+        db.query(models.Problem)
+        .filter(models.Problem.name == problem_name, models.Problem.user_id == user.id)
+        .first()
+    )
 
-    problem.name = updates.name
-    problem.date_solved = updates.date_solved
-    problem.difficulty = updates.difficulty
-    problem.topic = updates.topic
-    problem.notes = updates.notes
-    problem.user_id = user.id
+    if not problem:
+        raise HTTPException(status_code=404, detail=f"Problem '{problem_name}' not found for user '{username}'")
+
+    update_data = updates.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(problem, field, value)
 
     db.commit()
     db.refresh(problem)
