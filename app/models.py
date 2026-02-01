@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database import Base
@@ -15,6 +15,10 @@ class Problem(Base):
 
     user_id = Column(Integer, ForeignKey("users.id"))
     user = relationship("User", back_populates="problems")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", name="uq_user_problem_name"),
+    )
 
 class User(Base):
     __tablename__ = "users"
